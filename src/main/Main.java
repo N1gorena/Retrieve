@@ -5,9 +5,18 @@ import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.*;
 
+import com.sun.prism.impl.BufferUtil;
+
+import camara.CameraListener;
+import shaderBuilder.ProgramLinker;
+
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.nio.*;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 import static org.lwjgl.glfw.Callbacks.*;
@@ -18,133 +27,136 @@ import static org.lwjgl.system.MemoryUtil.*;
 
 public class Main {
 
+	private static ArrayList<StowBox> objects = new ArrayList<StowBox>();
+	
 	public static void main(String[] args) {
+		StowBox s1 = new StowBox(-5.0f,0.0f,0.0f);
+		StowBox s2 = new StowBox(5.0f,0.0f,0.0f);
+		objects.add(s1);
+		objects.add(s2);
+		
 		GLFWErrorCallback.createPrint(System.err).set();
 		glfwInit();
 		glfwDefaultWindowHints();
 	
-		long l = glfwCreateWindow(300, 300, "Hello World!", NULL, NULL);
+		long l = glfwCreateWindow(1200, 900, "Hello World!", NULL, NULL);
 		glfwMakeContextCurrent(l);
 		glfwShowWindow(l);
 		
-		GLFWKeyCallback keyCallback;
+		CameraListener cam = new CameraListener();
 		
-		glfwSetKeyCallback(l,keyCallback = new GLFWKeyCallback(){
-
-			@Override
-			public void invoke(long window, int key, int scancode, int action, int mods) {
-				if(key == GLFW_KEY_ESCAPE) {
-					glfwSetWindowShouldClose(l, true);
-				}
-				
-			}
-			
-		});
+		glfwSetKeyCallback(l,cam);
+		glfwSetCursorPosCallback(l, cam.getMause());
+		glfwSetInputMode(l, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		
 		GL.createCapabilities();
 		glClearColor(1.0f,0.0f,0.0f,0.0f);
 		
-		int vertexShader = -1;
-		int fragmentShader = -1;
-		Scanner shaderScanner;
-		int[] success = new int[1];
+		ProgramLinker program = new ProgramLinker("src\\files\\VertexShader","src\\files\\FragmentShader");
 		
-		vertexShader = GL30.glCreateShader(GL30.GL_VERTEX_SHADER);
-		StringBuilder vertexSrc = new StringBuilder();
-		File vertexFile = new File("src\\files\\VertexShader");
-		try {
-			shaderScanner = new Scanner(vertexFile);
-			while(shaderScanner.hasNextLine()) {
-				vertexSrc.append(shaderScanner.nextLine()).append(System.getProperty("line.separator"));
-			}
-			
-		} catch (FileNotFoundException e1) {
-			e1.printStackTrace();
-		}
-		GL30.glShaderSource(vertexShader, vertexSrc.toString());
-		GL30.glCompileShader(vertexShader);
-		
-		GL30.glGetShaderiv(vertexShader, GL30.GL_COMPILE_STATUS, success);
-		if(success[0] == 0) {
-			System.out.println("VERT::ERROR::" + GL30.glGetShaderInfoLog(vertexShader));	
-		}
-		
-		fragmentShader = GL30.glCreateShader(GL30.GL_FRAGMENT_SHADER);
-		StringBuilder fragSrc = new StringBuilder();
-		File fragFile = new File("src\\files\\FragmentShader");
-		try {
-			shaderScanner = new Scanner(fragFile);
-			while(shaderScanner.hasNextLine()) {
-				fragSrc.append(shaderScanner.nextLine()).append(System.getProperty("line.separator"));
-			}
-			
-		} catch (FileNotFoundException e1) {
-			e1.printStackTrace();
-		}
-		GL30.glShaderSource(fragmentShader , fragSrc.toString());
-		GL30.glCompileShader(fragmentShader );
-		
-		GL30.glGetShaderiv(fragmentShader , GL30.GL_COMPILE_STATUS, success);
-		if(success[0] == 0) {
-			System.out.println("FRAG::ERROR::" + GL30.glGetShaderInfoLog(fragmentShader ));	
-		}
-		
-		int mainProgram = GL30.glCreateProgram();
-		GL30.glAttachShader(mainProgram, vertexShader);
-		GL30.glAttachShader(mainProgram, fragmentShader);
-		GL30.glLinkProgram(mainProgram);
-		GL30.glGetProgramiv(mainProgram, GL30.GL_LINK_STATUS, success);
-		
-		if(success[0] == 0) {
-			System.out.println("PROGRAMLINK::ERROR::"+GL30.glGetProgramInfoLog(mainProgram));
-		}
-		
-		//ObjectMachine manModel = prepModel("src\\files\\freeSmoothMan.obj");
+		ObjectMachine manModel = prepModel("src\\files\\freeSmoothMan.obj");
 		ObjectMachine storageModel = prepModel("src\\files\\cube.obj");
 		
 		//IMPORTANT, IMPORTANT, IMPORTANT
+		int[] VAOs = new int[3];
+		GL30.glGenVertexArrays(VAOs);
+		
+		
 		int[] VBOs = new int[2];
 		GL30.glGenBuffers(VBOs);
 		int manVBO = VBOs[0];
-		int cubeVBO = VBOs[1];
+		int manEBO = VBOs[1];
 		
 		float vertices[] = {
-			    -0.5f, -0.5f, 0.0f,
-			     0.5f, -0.5f, 0.0f,
-			     0.0f,  0.5f, 0.0f
+			     0.5f,  0.5f, 0.0f,  // top right
+			     0.5f, -0.5f, 0.0f,  // bottom right
+			    -0.5f, -0.5f, 0.0f,  // bottom left
+			    -0.5f,  0.5f, 0.0f   // top left 
 			};
+		int indices[] = {  // note that we start from 0!
+			    0, 1, 3,   // first triangle
+			    1, 2, 3    // second triangle
+			};  
+		
+		vertices = storageModel.getTriangles();
+		indices = storageModel.getIndices();
+		
+		GL30.glBindVertexArray(VAOs[0]);
+		GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, manVBO);
+		GL30.glBufferData(GL30.GL_ARRAY_BUFFER,vertices,GL30.GL_STATIC_DRAW);
+		
+		GL30.glBindBuffer(GL30.GL_ELEMENT_ARRAY_BUFFER, manEBO);
+		GL30.glBufferData(GL30.GL_ELEMENT_ARRAY_BUFFER, indices, GL30.GL_STATIC_DRAW);
+		
+		GL30.glVertexAttribPointer(0, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
+		GL30.glEnableVertexAttribArray(0);
+		GL30.glDrawElements(GL30.GL_TRIANGLES, indices.length, GL30.GL_UNSIGNED_INT,0);
+		GL30.glBindVertexArray(0);
+		
+		GL30.glBindVertexArray(VAOs[1]);
+		GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, manVBO);
+		GL30.glBufferData(GL30.GL_ARRAY_BUFFER,vertices,GL30.GL_STATIC_DRAW);
+		
+		GL30.glBindBuffer(GL30.GL_ELEMENT_ARRAY_BUFFER, manEBO);
+		GL30.glBufferData(GL30.GL_ELEMENT_ARRAY_BUFFER, indices, GL30.GL_STATIC_DRAW);
+		
+		GL30.glVertexAttribPointer(0, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
+		GL30.glEnableVertexAttribArray(0);
+		GL30.glDrawElements(GL30.GL_TRIANGLES, indices.length, GL30.GL_UNSIGNED_INT,0);
+		GL30.glBindVertexArray(0);
 		
 		
+		Matrix4f box1Location = new Matrix4f().translate(-5.0f, 0.0f, 0.0f);
+		FloatBuffer box1Buffer = BufferUtils.createFloatBuffer(16);
+		box1Location.get(box1Buffer);
 		
-		
-		
+		Matrix4f box2Location = new Matrix4f().translate(5.0f, 0.0f, 0.0f);
+		FloatBuffer box2Buffer = BufferUtils.createFloatBuffer(16);
+		box2Location.get(box2Buffer);
 		
 		while ( !glfwWindowShouldClose(l)) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
 
 			
-			GL30.glUseProgram(mainProgram);
+			GL30.glUseProgram(program.getProgram());
+			int camLoc = GL30.glGetUniformLocation(program.getProgram(), "camera");
+			int transLocation = GL30.glGetUniformLocation(program.getProgram(),"locationMatrix" );
+			GL30.glUniformMatrix4fv(camLoc, false, cam.getCamara());
 			
-			GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, manVBO);
-			GL30.glBufferData(GL30.GL_ARRAY_BUFFER,vertices,GL30.GL_STATIC_DRAW);
-			GL30.glVertexAttribPointer(0, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
-			GL30.glEnableVertexAttribArray(0);
-			GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, 3);
 			
+			GL30.glBindVertexArray(VAOs[0]);
+			GL30.glUniformMatrix4fv(transLocation, false, box1Buffer);
+			GL30.glDrawElements(GL30.GL_TRIANGLES, indices.length, GL30.GL_UNSIGNED_INT,0);
+			
+			GL30.glBindVertexArray(VAOs[1]);
+			GL30.glUniformMatrix4fv(transLocation, false, box2Buffer);
+			GL30.glDrawElements(GL30.GL_TRIANGLES, indices.length, GL30.GL_UNSIGNED_INT,0);
+			
+			
+			//Gotta be quicker
 			glfwSwapBuffers(l); // swap the color buffers
 			// Poll for window events. The key callback above will only be
 			// invoked during this call.
 			glfwPollEvents();
+			
+			//MyEvents
+			for(int i = 0; i < objects.size() ; i++) {
+				Vector3f result = new Vector3f();;
+				cam.getPosition().sub(objects.get(i).getPosition(), result);
+				if(result.length() <= 2.0f && glfwGetKey(l,GLFW_KEY_F) == GLFW_PRESS) {
+					System.out.println("here");
+				}
+			}
 		}
 	}
 	
 	public static ObjectMachine prepModel(String fileLoc) {
 		File manFile = new File(fileLoc);
 		Scanner fileScanner;
-		
+		ObjectMachine modelMaker = new ObjectMachine();
 		try {
 			fileScanner = new Scanner(manFile);
-			ObjectMachine modelMaker = new ObjectMachine();
+			
 			
 			while (fileScanner.hasNextLine()) {
 				String fileLine = fileScanner.nextLine();
@@ -171,22 +183,28 @@ public class Main {
 					Face newFace = new Face();
 					
 					int[] vertIndices = new int[3];
-					vertIndices[0] = Integer.parseInt(faceTokens[1]);
-					vertIndices[1] = Integer.parseInt(faceTokens[3]);
-					vertIndices[2] = Integer.parseInt(faceTokens[5]);
+					vertIndices[0] = Integer.parseInt(faceTokens[1]) - 1;
+					vertIndices[1] = Integer.parseInt(faceTokens[3]) - 1;
+					vertIndices[2] = Integer.parseInt(faceTokens[5]) - 1;
 					newFace.addVertices(vertIndices);
 					
 					
+					modelMaker.setVertexNormal(Integer.parseInt(faceTokens[1])-1,Integer.parseInt(faceTokens[2])-1);
+					modelMaker.setVertexNormal(Integer.parseInt(faceTokens[3])-1,Integer.parseInt(faceTokens[4])-1);
+					modelMaker.setVertexNormal(Integer.parseInt(faceTokens[5])-1,Integer.parseInt(faceTokens[6])-1);
+					
 					modelMaker.addFace(newFace);
 				}
-				fileScanner.close();
-				return modelMaker;
+				
+				
 			}
+			fileScanner.close();
 		} catch (FileNotFoundException e) {
 			
 			e.printStackTrace();
 		}
-		return null;
+		
+		return modelMaker;
 	}
 
 }

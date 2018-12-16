@@ -1,9 +1,9 @@
 package main;
 
 public class Face {
-	int vertexA = -1;
-	int vertexB = -1;
-	int vertexC = -1;
+	private int vertexA = -1;
+	private int vertexB = -1;
+	private int vertexC = -1;
 	
 	int faceNormal = -1;
 	
@@ -16,6 +16,16 @@ public class Face {
 		vertexB = vertIndices[1];
 		vertexC = vertIndices[2];
 		
+	}
+	
+	public int getA() {
+		return vertexA;
+	}
+	public int getC() {
+		return vertexC;
+	}
+	public int getB() {
+		return vertexB;
 	}
 
 }
