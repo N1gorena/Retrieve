@@ -78,8 +78,8 @@ public class Main {
 			    1, 2, 3    // second triangle
 			};  
 		
-		vertices = storageModel.getTriangles();
-		indices = storageModel.getIndices();
+		vertices = manModel.getTriangles();
+		indices = manModel.getIndices();
 		
 		GL30.glBindVertexArray(VAOs[0]);
 		GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, manVBO);
@@ -116,7 +116,8 @@ public class Main {
 		
 		while ( !glfwWindowShouldClose(l)) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
-
+			
+			GL30.glPolygonMode(GL30.GL_FRONT_AND_BACK, GL30.GL_LINE);
 			
 			GL30.glUseProgram(program.getProgram());
 			int camLoc = GL30.glGetUniformLocation(program.getProgram(), "camera");
