@@ -54,18 +54,23 @@ public class Main {
 		
 		ProgramLinker program = new ProgramLinker("src\\files\\VertexShader","src\\files\\FragmentShader");
 		
-		ObjectMachine manModel = prepModel("src\\files\\freeSmoothMan.obj");
-		ObjectMachine storageModel = prepModel("src\\files\\cube.obj");
+		File x = new File("src\\files\\Case.obj");
+		File y = new File("src\\files\\Agent.obj");
+		
+		ObjectMachine manModel = ObjectMachine.prepModel(x);
+		ObjectMachine storageModel = ObjectMachine.prepModel(y);
 		
 		//IMPORTANT, IMPORTANT, IMPORTANT
 		int[] VAOs = new int[3];
 		GL30.glGenVertexArrays(VAOs);
 		
 		
-		int[] VBOs = new int[2];
+		int[] VBOs = new int[4];
 		GL30.glGenBuffers(VBOs);
 		int manVBO = VBOs[0];
 		int manEBO = VBOs[1];
+		int storageVBO = VBOs[2];
+		int storageEBO = VBOs[3];
 		
 		float vertices[] = {
 			     0.5f,  0.5f, 0.0f,  // top right
@@ -93,11 +98,14 @@ public class Main {
 		GL30.glDrawElements(GL30.GL_TRIANGLES, indices.length, GL30.GL_UNSIGNED_INT,0);
 		GL30.glBindVertexArray(0);
 		
+		vertices = storageModel.getTriangles();
+		indices = storageModel.getIndices();
+		
 		GL30.glBindVertexArray(VAOs[1]);
-		GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, manVBO);
+		GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, storageVBO);
 		GL30.glBufferData(GL30.GL_ARRAY_BUFFER,vertices,GL30.GL_STATIC_DRAW);
 		
-		GL30.glBindBuffer(GL30.GL_ELEMENT_ARRAY_BUFFER, manEBO);
+		GL30.glBindBuffer(GL30.GL_ELEMENT_ARRAY_BUFFER, storageEBO);
 		GL30.glBufferData(GL30.GL_ELEMENT_ARRAY_BUFFER, indices, GL30.GL_STATIC_DRAW);
 		
 		GL30.glVertexAttribPointer(0, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
@@ -106,17 +114,17 @@ public class Main {
 		GL30.glBindVertexArray(0);
 		
 		
-		Matrix4f box1Location = new Matrix4f().translate(-5.0f, 0.0f, 0.0f);
+		Matrix4f box1Location = new Matrix4f().translate(-2.0f, 0.0f, 0.0f);
 		FloatBuffer box1Buffer = BufferUtils.createFloatBuffer(16);
 		box1Location.get(box1Buffer);
 		
-		Matrix4f box2Location = new Matrix4f().translate(5.0f, 0.0f, 0.0f);
+		Matrix4f box2Location = new Matrix4f().translate(2.0f, 0.0f, 0.0f);
 		FloatBuffer box2Buffer = BufferUtils.createFloatBuffer(16);
 		box2Location.get(box2Buffer);
 		
 		while ( !glfwWindowShouldClose(l)) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
-			
+			//HERE is where the Mode is.
 			GL30.glPolygonMode(GL30.GL_FRONT_AND_BACK, GL30.GL_LINE);
 			
 			GL30.glUseProgram(program.getProgram());
@@ -151,61 +159,6 @@ public class Main {
 		}
 	}
 	
-	public static ObjectMachine prepModel(String fileLoc) {
-		File manFile = new File(fileLoc);
-		Scanner fileScanner;
-		ObjectMachine modelMaker = new ObjectMachine();
-		try {
-			fileScanner = new Scanner(manFile);
-			
-			
-			while (fileScanner.hasNextLine()) {
-				String fileLine = fileScanner.nextLine();
-				String[] tokens = fileLine.split(" ");
-				String keyToken = tokens[0];
-				if(keyToken.equals("v")) {
-					float[] vertex = new float[3];
-					vertex[0] = Float.parseFloat(tokens[1]);
-					vertex[1] = Float.parseFloat(tokens[2]);
-					vertex[2] = Float.parseFloat(tokens[3]);
-					modelMaker.addVertex(vertex);
-				}
-				else if(keyToken.equals("vn")) {
-					float[] normal = new float[3];
-					normal[0] = Float.parseFloat(tokens[1]);
-					normal[1] = Float.parseFloat(tokens[2]);
-					normal[2] = Float.parseFloat(tokens[3]);
-					modelMaker.addNormal(normal);
-					
-				}
-				else if(keyToken.equals("f")) {
-					String[] faceTokens = fileLine.split("(\\s|\\/+)");
-					
-					Face newFace = new Face();
-					
-					int[] vertIndices = new int[3];
-					vertIndices[0] = Integer.parseInt(faceTokens[1]) - 1;
-					vertIndices[1] = Integer.parseInt(faceTokens[3]) - 1;
-					vertIndices[2] = Integer.parseInt(faceTokens[5]) - 1;
-					newFace.addVertices(vertIndices);
-					
-					
-					modelMaker.setVertexNormal(Integer.parseInt(faceTokens[1])-1,Integer.parseInt(faceTokens[2])-1);
-					modelMaker.setVertexNormal(Integer.parseInt(faceTokens[3])-1,Integer.parseInt(faceTokens[4])-1);
-					modelMaker.setVertexNormal(Integer.parseInt(faceTokens[5])-1,Integer.parseInt(faceTokens[6])-1);
-					
-					modelMaker.addFace(newFace);
-				}
-				
-				
-			}
-			fileScanner.close();
-		} catch (FileNotFoundException e) {
-			
-			e.printStackTrace();
-		}
-		
-		return modelMaker;
-	}
+	
 
 }
